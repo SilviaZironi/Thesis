@@ -8,7 +8,7 @@ allowing:
 
 ---
 
-## 📦 Project Structure
+## Project Structure
 
 ```
 ├── fortran/               # Original Fortran sources (main.f90, modules, makefile)
@@ -30,7 +30,7 @@ allowing:
 
 ---
 
-## ⚙️ Requirements
+## Requirements
 
 - **Python ≥ 3.8**
 - **NumPy**, **Pandas**, **Matplotlib**
@@ -50,7 +50,7 @@ This will produce an executable named `run` (default name expected by the Python
 
 ---
 
-## 🚀 1. Running TRIMOD from Python
+## 1. Running TRIMOD from Python
 
 ### File: `runner.py`
 
@@ -76,7 +76,7 @@ python runner.py --exe ./run --workdir ./WORK --theta -50 -30 1.5 2.0
 
 ---
 
-## 🧠 2. Bayesian Inference Layer
+## 2. Bayesian Inference Layer
 
 ### File: `bayes_trimod.py`
 
@@ -109,7 +109,7 @@ param, x, E3, logpost, post_norm
 
 ---
 
-## 📊 3. Visualization of Results
+## 3. Visualization of Results
 
 ### File: `sweep.py`
 
@@ -135,7 +135,7 @@ If running in Jupyter, you can visualize inline instead.
 
 ---
 
-## 🧩 4. Typical Workflow
+## 4. Typical Workflow
 
 1. **Compile** the Fortran code (`make` inside `fortran/`)
 2. **Run TRIMOD** via Python for a single parameter set:
@@ -154,7 +154,7 @@ If running in Jupyter, you can visualize inline instead.
 
 ---
 
-## ⚗️ 5. Notes on Integration
+## 5. Notes on Integration
 
 - All runs are executed inside `WORK/`, which can be safely cleaned between simulations.
 
@@ -164,7 +164,7 @@ If running in Jupyter, you can visualize inline instead.
 ---
 
 
-## 🙌 Acknowledgements
+## Acknowledgements
 
 This project was developed as part of the Master’s Thesis in **Nuclear and Subnuclear Physics**,  
 focused on the Bayesian analysis of the triton ground state using TRIMOD.
