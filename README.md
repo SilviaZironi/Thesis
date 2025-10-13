@@ -42,7 +42,7 @@ pip install numpy pandas matplotlib
 
 Ensure your Fortran code is compiled:
 ```bash
-cd fortran
+cd fortran #path 
 make
 ```
 
