@@ -54,6 +54,16 @@ def logposterior(theta: Iterable[float], tr: TrimodRunner) -> float:
         # non-converged run ⇒ posterior ~ 0
         return -math.inf
 
+
+
+
+
+"""
+sweep 1d: solo abbozzato, serve prima che TRIMOD legga params.in oppure riuscire a variare i parametri del potenziale su 
+TRIMOD
+CAPIRE ANCHE SE HA SENSO
+"""
+
 def logsumexp(a):
     """
     log( sum_i exp(a_i) ) 
@@ -144,6 +154,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
