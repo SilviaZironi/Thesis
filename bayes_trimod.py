@@ -1,3 +1,14 @@
+"""
+bayes_trimod.py — Minimal Bayesian layer on top of TRIMOD, using runner.py
+- box prior on (v01, v02, a1, a2)
+- Gaussian likelihood on E3 with sigma (theory) + optional sigma_exp
+- posterior = prior + likelihood in log space
+- includes a simple 1D grid sweep utility (for quick plots)
+
+Run examples:
+    python bayes_trimod.py --exe ./run --workdir ./WORK --sweep1d v01 -120 -20 12
+    python bayes_trimod.py --exe ./run --workdir ./WORK --theta -50 -30 1.5 2.0
+"""
 from __future__ import annotations
 import argparse, math, csv
 from dataclasses import dataclass
@@ -5,46 +16,45 @@ from typing import Iterable, Tuple, List, Dict, Optional
 
 import numpy as np
 
+def logsumexp(a):
+    a = np.asarray(a, dtype=float)
+    m = np.nanmax(a)
+    if not np.isfinite(m):
+        return -np.inf
+    return m + np.log(np.nansum(np.exp(a - m)))
+
 from runner import TrimodRunner
 
-E3_EXP   = -8.482   # MeV (trizio reale) --> energia di legame del trizio, negativa per stato legato
-SIGMA_TH = 0.5      # MeV (stima incertezza teorica: va poi sistemata)
-SIGMA_EXP = 0.001    # MeV (incertezza sperimentale, trascurabile qui)
-SIGMA    = math.hypot(SIGMA_TH, SIGMA_EXP)  # sigma totale in quadratura
+# --- Reference triton energy and uncertainties ---
+E3_EXP   = -8.482   # MeV (experimental)
+SIGMA_TH = 0.5      # MeV (theory/model uncertainty) — adjust with your advisor
+SIGMA_EXP= 0.001    # MeV (experimental; tiny, often negligible)
+SIGMA    = math.hypot(SIGMA_TH, SIGMA_EXP)
 
-PRIOR_RANGES = {             #prior uniforme (box) sui 4 parametri 
-    "v01": (-200.0, -1.0), # MeV
-    "v02": (-200.0, -1.0), # MeV
-    "a1":  (0.2, 5.0), #fm
-    "a2":  (0.2, 5.0), #fm
+# --- Prior ranges (box) — adjust ranges to sensible physics ---
+PRIOR_RANGES = {
+    'v01': (-620.0, -530.0),
+    'v02': (1200.0, 1600.0),
+    'a1' : (1.40, 1.70),
+    'a2' : (2.80, 3.40),
 }
 
-def logprior(theta: Iterable[float]) -> float: 
-    """
-    prior uniforme: 0 se dentro il box, -inf se fuori
-    """
+def logprior(theta: Iterable[float]) -> float:
     v01,v02,a1,a2 = theta
     if not(PRIOR_RANGES["v01"][0] <= v01 <= PRIOR_RANGES["v01"][1]): return -math.inf
     if not(PRIOR_RANGES["v02"][0] <= v02 <= PRIOR_RANGES["v02"][1]): return -math.inf
     if not(PRIOR_RANGES["a1"][0]  <= a1  <= PRIOR_RANGES["a1"][1]):  return -math.inf
     if not(PRIOR_RANGES["a2"][0]  <= a2  <= PRIOR_RANGES["a2"][1]):  return -math.inf
+    # uniform box prior: constant (drop additive constant)
     return 0.0
 
-def loglike(theta: Iterable[float], tr: TrimodRunner) -> float:  #likelihood gaussiana su E3
-    """
-    calcola la log-likelihood gaussiana:
-      L ∝ exp( - (E3(theta)-E3_exp)^2 / (2 sigma^2) )
-     e restituisce la versione log con la costante di normalizzazione
-    """
-    E3 = tr.run_one(theta) #lancia trimod e legge E3
+def loglike(theta: Iterable[float], tr: TrimodRunner) -> float:
+    # Write params, run TRIMOD, read E3
+    E3 = tr.run_one(theta)
     r  = (E3 - E3_EXP) / SIGMA
     return -0.5 * (r*r) - math.log(SIGMA * math.sqrt(2.0*math.pi))
 
 def logposterior(theta: Iterable[float], tr: TrimodRunner) -> float:
-    """
-    logposterior = logprior + loglike.
-    Se TRIMOD non converge o lancia eccezioni, restituisce -inf (posterior ~ 0)
-    """
     lp = logprior(theta)
     if not np.isfinite(lp):
         return -math.inf
@@ -54,34 +64,12 @@ def logposterior(theta: Iterable[float], tr: TrimodRunner) -> float:
         # non-converged run ⇒ posterior ~ 0
         return -math.inf
 
+# --- CLI utilities ---
 
-
-
-
-"""
-sweep 1d: solo abbozzato, serve prima che TRIMOD legga params.in oppure riuscire a variare i parametri del potenziale su 
-TRIMOD
-CAPIRE ANCHE SE HA SENSO
-"""
-
-def logsumexp(a):
-    """
-    log( sum_i exp(a_i) ) 
-    """
-    a = np.asarray(a, dtype=float)
-    m = np.nanmax(a)
-    if not np.isfinite(m):
-        return -np.inf
-    return m + np.log(np.nansum(np.exp(a - m)))
-    
 def sweep1d(param: str, pmin: float, pmax: float, n: int,
             theta_fixed: Tuple[float, float, float, float],
             tr: TrimodRunner, csv_out: str | None = None) -> List[Dict[str, float]]:
-    """
-    Valuta logposterior su una griglia 1D del parametro `param` ∈ {v01,v02,a1,a2}
-    Gli altri 3 parametri restano fissi
-    """
-    idx = {"v01":0,"v02":1,"a1":2,"a2":3}[param] #indice del parametro da variare
+    idx = {"v01":0,"v02":1,"a1":2,"a2":3}[param]
     grid = np.linspace(pmin, pmax, n)
     rows: List[Dict[str,float]] = []
     for val in grid:
@@ -113,6 +101,7 @@ def sweep1d(param: str, pmin: float, pmax: float, n: int,
 
     return rows
 
+
 def main():
     ap = argparse.ArgumentParser(description="Bayesian layer for TRIMOD (Fortran)")
     ap.add_argument("--exe", default="./run")
@@ -128,19 +117,20 @@ def main():
 
     tr = TrimodRunner(exe=args.exe, workdir=args.workdir)
 
-    if args.theta:  #valutazione singola del posterior
+    if args.theta:
         th = tuple(args.theta)
         lp = logposterior(th, tr)
         print(f"logposterior({th}) = {lp}")
         return
 
-    if args.sweep1d:  #sweep 1D
+    if args.sweep1d:
         param, pmin, pmax, n = args.sweep1d
         if param not in ("v01","v02","a1","a2"):
             raise SystemExit("param must be one of: v01 v02 a1 a2")
         rows = sweep1d(param, float(pmin), float(pmax), int(n),
                         theta_fixed=tuple(args.theta_fixed), tr=tr,
                         csv_out=args.csv)
+        # print short summary
         xs = np.array([r["x"] for r in rows])
         e3 = np.array([r["E3"] for r in rows], dtype=float)
         post = np.array([r["post_norm"] for r in rows], dtype=float)
@@ -154,10 +144,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
